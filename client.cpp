@@ -157,7 +157,7 @@ void execute_command(char buffer[]){
 
 		string resp = connect_with_tracker(buff);
 
-		if(resp == "Logout Successfull!"){
+		if(resp == "Logout Successfull."){
 
 			cout<<"<================================ LOGGED OUT ==================================>"<<endl<<endl;
 
@@ -224,7 +224,17 @@ void execute_command(char buffer[]){
 		return;
 	}
 
-	if(keyword == "join_group" || keyword == "create_group" || keyword == "leave_group" || keyword == "requests" || keyword == "accept_request"){
+	if(keyword == "upload_file" && loginStatus == false){
+		cout<<"Response: Please login your account to uplaod a file. "<<endl<<endl;
+		return;
+	}
+
+	if(keyword == "list_files" && loginStatus == false){
+		cout<<"Response: Please login your account to view all files in a group. "<<endl<<endl;
+		return;
+	}
+
+	if(keyword == "join_group" || keyword == "create_group" || keyword == "leave_group" || keyword == "requests" || keyword == "accept_request" || keyword == "upload_file" || keyword == "list_files"){
 		string b = buffer;
 		b = b + " " + userID;
 		strcpy(buffer, b.c_str());
@@ -233,11 +243,11 @@ void execute_command(char buffer[]){
 	string resp = connect_with_tracker(buffer);
 
 	if(keyword == "login"){
-		if(resp == "Login Successfull!"){
+		if(resp == "Login Successfull."){
 			loginStatus = true;
 			userID = tokens[1];
 			passWORD = tokens[2];
-			cout<<"=============================> LOGGED IN : "<<userID<<" <=============================="<<endl<<endl;
+			cout<<"============================> LOGGED IN : "<<userID<<" <============================="<<endl<<endl;
 		}
 	}
 }

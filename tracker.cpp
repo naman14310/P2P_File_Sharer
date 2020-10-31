@@ -1,7 +1,7 @@
 #include<bits/stdc++.h>
-#include <unistd.h> 
-#include <sys/socket.h> 
-#include <netinet/in.h> 
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include<pthread.h>
 using namespace std;
@@ -11,6 +11,7 @@ unordered_map<string, string> users;
 unordered_map<string, set<string>> groups;
 unordered_map<string, string> admin;
 unordered_map<string, set<string>> groupReqs;
+unordered_map<string, unordered_map<string, set<string>>> files;
 
 string TRACKER_IP;
 int TRACKER_PORT;
@@ -34,11 +35,11 @@ vector<string> split_args(string str){
 string createUser(string userId, string password){
 
     if(users.find(userId) != users.end()){
-        return ("User already exists!");
+        return ("User already exists.");
     }
     else{
         users[userId] = password;
-        return ("Registered Successfully!"); 
+        return ("Registered Successfully."); 
     }
 
 }
@@ -46,24 +47,24 @@ string createUser(string userId, string password){
 string login(string userId, string password){
     if(users.find(userId) != users.end()){
         if(users[userId] == password){
-            return ("Login Successfull!");
+            return ("Login Successfull.");
         }
         else{
-            return ("Please enter correct password!");
+            return ("Please enter correct password.");
         }
     }
-    else return ("User Doesn't exist!");
+    else return ("User Doesn't exist.");
     
 }
 
 string createGroup(string groupId, string userId){
     if(groups.find(groupId) != groups.end()){
-        return("Group already exist!");
+        return("Group already exist.");
     }
     else{
         groups[groupId].insert(userId);
         admin[groupId] = userId;
-        return("Group created sucessfully!");
+        return("Group created sucessfully.");
     }
 }
 
@@ -80,7 +81,7 @@ string joinGroup(string groupId, string userId){
         return("Group joining request Sent.");
         }
     }
-    else return("Group Doesn't exist!");
+    else return("Group Doesn't exist.");
 }
 
 string leaveGroup(string groupId, string userId){
@@ -94,14 +95,14 @@ string leaveGroup(string groupId, string userId){
         return("You're not present in this group.");
         
     }
-    else return("Group Doesn't exist!");
+    else return("Group Doesn't exist.");
 }
 
 string logout(string userId){
     if(users.find(userId) != users.end()){
-        return ("Logout Successfull!");
+        return ("Logout Successfull.");
     }
-    else return ("User Doesn't exist!");
+    else return ("User Doesn't exist.");
     
 }
 
@@ -111,6 +112,9 @@ string showRequests(string groupId, string userId){
             return("Permission Denied! You're not an admin of this group.");
         }
         else{
+
+            if(groupReqs[groupId].empty()) return("No pending requests.");
+
             string s = "";
             for (auto uid = groupReqs[groupId].begin(); uid != groupReqs[groupId].end(); ++uid) 
             {
@@ -120,7 +124,7 @@ string showRequests(string groupId, string userId){
             return resp; 
         }
     }
-    else return("Group Doesn't exist!");
+    else return("Group Doesn't exist.");
 }
 
 string acceptRequests(string groupId, string userId, string loggedIn){
@@ -136,7 +140,7 @@ string acceptRequests(string groupId, string userId, string loggedIn){
                 //cout<<"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"<<endl;
                 groups[groupId].insert(userId);
                 groupReqs[groupId].erase(userId);
-                return("Joining request accepted for : " + userId);
+                return("Joining request accepted for " + userId);
             }
             else{
                 //cout<<"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"<<endl;
@@ -144,10 +148,13 @@ string acceptRequests(string groupId, string userId, string loggedIn){
             }
         }
     }
-    else return("Group Doesn't exist!");
+    else return("Group Doesn't exist.");
 }
 
 string listGroups(){
+    
+    if(groups.empty()) return("No groups present in this Network.");
+    
     string s = "";
     for(auto grp : groups){
         string fs = grp.first.substr(0, grp.first.length()-1);
@@ -164,6 +171,69 @@ string listGroups(){
     return resp; 
 }
 
+bool containsFile(string filePath, string groupId){
+    if(files.find(groupId) != files.end()){
+        if(files[groupId].find(filePath) != files[groupId].end()){
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isMember(string groupId, string userId){
+    if(groups[groupId].find(userId) != groups[groupId].end())
+        return true;
+    return false;
+}
+
+string uploadFile(string filePath, string groupId, string userId){
+    
+    if(groups.find(groupId) != groups.end()){
+
+       if(!isMember(groupId, userId)) return("You're not a member of this group.");
+
+       string gid = groupId.substr(0, groupId.length()-1); 
+       
+       if(containsFile(filePath, groupId)){
+           if(files[groupId][filePath].find(userId) != files[groupId][filePath].end()){
+               return ("You're already present in seeder list.");
+           }
+           else{
+               files[groupId][filePath].insert(userId);
+               string resp = "One more seeder added for file " + filePath + " in " + gid + ".";
+               return(resp);
+           }
+       }
+       else{
+           files[groupId][filePath].insert(userId);
+           string resp = "New file uploaded successfully in " + gid + ".";
+           return(resp);
+       }
+        
+    }
+    else return("Group Doesn't exist.");
+}
+
+string listFiles(string groupId, string userId){
+    if(groups.find(groupId) != groups.end()){
+
+       if(!isMember(groupId, userId)) return("You're not a member of this group.");
+
+       string gid = groupId.substr(0, groupId.length()-1);
+
+       if(files.find(groupId) == files.end()) return ("No files present in " + gid);
+
+        string s = "";
+        for(auto file : files[groupId]){
+            string fs = file.first;
+            s += "<" + fs + ">" + "|";
+        }
+        string resp = s.substr(0, s.length()-1);
+        return resp;
+    }
+    else return("Group Doesn't exist.");
+}
+
 string processCommand(string command){
 
     vector<string> tokens;
@@ -176,42 +246,49 @@ string processCommand(string command){
     string cmd = tokens[0];
 
     if(cmd == "create_user"){
+        if(tokens.size()!=3) return("Please enter valid command!");
         string uid =  tokens[1];
         string pass = tokens[2];
         return createUser(uid, pass);
     }
 
     if(cmd == "login"){
+        if(tokens.size()!=3) return("Please enter valid command!");
         string uid =  tokens[1];
         string pass = tokens[2];
         return login(uid, pass);
     }
 
     if(cmd == "create_group"){
+        if(tokens.size()!=3) return("Please enter valid command!");
         string gid = tokens[1];
         string uid = tokens[2];
         return createGroup(gid, uid);
     }
 
     if(cmd == "join_group"){
+        if(tokens.size()!=3) return("Please enter valid command!");
         string gid = tokens[1];
         string uid = tokens[2];
         return joinGroup(gid, uid);
     }
 
     if(cmd == "leave_group"){
+        if(tokens.size()!=3) return("Please enter valid command!");
         string gid = tokens[1];
         string uid = tokens[2];
         return leaveGroup(gid, uid);
     }
 
     if(cmd == "requests"){
+        if(tokens.size()!=4) return("Please enter valid command!");
         string gid = tokens[2];
         string uid = tokens[3];
         return showRequests(gid, uid);
     }
 
     if(cmd == "accept_request"){
+        if(tokens.size()!=4) return("Please enter valid command!");
         string gid = tokens[1] + "\n";
         string ud = tokens[2];
         string loggedIn = tokens[3];
@@ -219,16 +296,33 @@ string processCommand(string command){
        // cout<<gid<<gid.length()<<endl;
        // gid=="ib" ? cout<<"TRUE" : cout<<"FALSE";cout<<endl;
        // cout<<uid<<uid.length()<<endl;*/
-        cout<<loggedIn<<loggedIn.length()<<endl;
+        //cout<<loggedIn<<loggedIn.length()<<endl;
         return acceptRequests(gid, uid, loggedIn);
     }
 
     if(cmd == "list_groups"){
+        if(tokens.size()!=2) return("Please enter valid command!");
         string uid = tokens[1];
         return listGroups();
     }
 
+    if(cmd == "list_files"){
+        if(tokens.size()!=3) return("Please enter valid command!");
+        string gid = tokens[1];
+        string uid = tokens[2];
+        return listFiles(gid, uid);
+    }
+
+    if(cmd == "upload_file"){
+        if(tokens.size()!=4) return("Please enter valid command!");
+        string path = tokens[1];
+        string gid = tokens[2];
+        string uid = tokens[3];
+        return uploadFile(path, gid, uid);
+    }
+
     if(cmd == "logout"){
+        if(tokens.size()!=2) return("Please enter valid command!");
         string uid = tokens[1];
         return logout(uid);
     }
