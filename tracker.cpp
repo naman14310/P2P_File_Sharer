@@ -11,7 +11,8 @@ unordered_map<string, string> users;
 unordered_map<string, set<string>> groups;
 unordered_map<string, string> admin;
 unordered_map<string, set<string>> groupReqs;
-unordered_map<string, unordered_map<string, set<string>>> files;
+unordered_map<string, unordered_map<string, set<pair<string,string>>>> files;
+unordered_map<string, string> namePathMap;
 
 string TRACKER_IP;
 int TRACKER_PORT;
@@ -186,26 +187,44 @@ bool isMember(string groupId, string userId){
     return false;
 }
 
-string uploadFile(string filePath, string groupId, string userId){
+string getFileName(string path){
+    int i;
+    for(i=path.length()-1; i>=0; i--){
+        if(path[i] == '/') break;
+    }
+
+    if(i<path.length()-1){
+        string fileName = path.substr(i+1, path.length());
+        namePathMap[name] = path;
+        return name;
+    }
+
+    else return "Invalid";
+}
+
+string uploadFile(string filePath, string groupId, string userId, string iport){
     
     if(groups.find(groupId) != groups.end()){
 
        if(!isMember(groupId, userId)) return("You're not a member of this group.");
 
        string gid = groupId.substr(0, groupId.length()-1); 
+       string fileName = getFileName(filePath);
+
+       if(fileName == "Invalid") return ("You've provided incorrect file path. Please provide correct path.")
        
-       if(containsFile(filePath, groupId)){
-           if(files[groupId][filePath].find(userId) != files[groupId][filePath].end()){
+       if(containsFile(fileName, groupId)){
+           if(files[groupId][fileName].find({userId, iport}) != files[groupId][fileName].end()){
                return ("You're already present in seeder list.");
            }
            else{
-               files[groupId][filePath].insert(userId);
-               string resp = "One more seeder added for file " + filePath + " in " + gid + ".";
+               files[groupId][fileName].insert({userId, iport});
+               string resp = "One more seeder added for file " + fileName + " in " + gid + ".";
                return(resp);
            }
        }
        else{
-           files[groupId][filePath].insert(userId);
+           files[groupId][fileName].insert({userId, iport});
            string resp = "New file uploaded successfully in " + gid + ".";
            return(resp);
        }
@@ -314,11 +333,12 @@ string processCommand(string command){
     }
 
     if(cmd == "upload_file"){
-        if(tokens.size()!=4) return("Please enter valid command!");
+        if(tokens.size()!=5) return("Please enter valid command!");
         string path = tokens[1];
         string gid = tokens[2];
         string uid = tokens[3];
-        return uploadFile(path, gid, uid);
+        string iport = tokens[4];
+        return uploadFile(path, gid, uid, iport);
     }
 
     if(cmd == "logout"){

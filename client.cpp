@@ -18,6 +18,7 @@ string TRACKER_IP;
 int TRACKER_PORT;
 string PEER_IP;
 int PEER_PORT;
+string IPORT;
 
 string userID;
 string passWORD;
@@ -234,9 +235,15 @@ void execute_command(char buffer[]){
 		return;
 	}
 
-	if(keyword == "join_group" || keyword == "create_group" || keyword == "leave_group" || keyword == "requests" || keyword == "accept_request" || keyword == "upload_file" || keyword == "list_files"){
+	if(keyword == "join_group" || keyword == "create_group" || keyword == "leave_group" || keyword == "requests" || keyword == "accept_request" || keyword == "list_files"){
 		string b = buffer;
 		b = b + " " + userID;
+		strcpy(buffer, b.c_str());
+	}
+
+	if(keyword == "upload_file"){
+		string b = buffer;
+		b = b + " " + userID + " " +  IPORT;
 		strcpy(buffer, b.c_str());
 	}
 
@@ -296,8 +303,8 @@ int main(int argc, char *argv[])
 	if(argc < 3) error("Please write valid command");
 
 	//cout<<"Hello";
-
-	vector<string> arguments = split_args(argv[1]);
+	IPORT = argv[1];
+	vector<string> arguments = split_args(IPORT);
 	string ip = arguments[0];
 	string port = arguments[1];
 	int portno = atoi(port.c_str());
