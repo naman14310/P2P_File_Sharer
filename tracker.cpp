@@ -145,7 +145,7 @@ string acceptRequests(string groupId, string userId, string loggedIn){
             }
             else{
                 //cout<<"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"<<endl;
-                return("No request found for : " + userId);
+                return("No request found for " + userId);
             }
         }
     }
@@ -195,8 +195,8 @@ string getFileName(string path){
 
     if(i<path.length()-1){
         string fileName = path.substr(i+1, path.length());
-        namePathMap[name] = path;
-        return name;
+        namePathMap[fileName] = path;
+        return fileName;
     }
 
     else return "Invalid";
@@ -211,7 +211,7 @@ string uploadFile(string filePath, string groupId, string userId, string iport){
        string gid = groupId.substr(0, groupId.length()-1); 
        string fileName = getFileName(filePath);
 
-       if(fileName == "Invalid") return ("You've provided incorrect file path. Please provide correct path.")
+       if(fileName == "Invalid") return ("You've provided incorrect file path. Please provide correct path.");
        
        if(containsFile(fileName, groupId)){
            if(files[groupId][fileName].find({userId, iport}) != files[groupId][fileName].end()){
