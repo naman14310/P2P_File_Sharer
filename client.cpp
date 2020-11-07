@@ -52,8 +52,14 @@ void save_tracker_details(string path){
 	TRACKER_PORT = stoi(tdv[1]);
 } 
 
-void process_request(int newsockfd, string ip, int port){
+void process_request(int newsockfd, int port){
 	
+	/*int newsockfd = * (int*)p_newsockfd;
+    free(p_newsockfd);
+	int port = * (int*)p_port;
+    free(p_port);*/
+	string ip = TRACKER_IP;
+
 	while(true){
 		char buffer[BUFFER_SIZE];
 		bzero(buffer, BUFFER_SIZE);
@@ -64,13 +70,45 @@ void process_request(int newsockfd, string ip, int port){
 		stringstream ss(command);
     	while(ss.good()){
      	    string sb;
-			getline(ss, sb, ' ');
+			getline(ss, sb, '|');
         	tokens.push_back(sb);}
         
 		string cmd = tokens[0];
 
-		if(cmd == "get_packet"){
+		if(cmd == "get_chunk"){
+			string path = tokens[1];
+			long long fileSize = stoll(tokens[2]);
+			/*****************************************************************************************/
+		FILE* sourceFile;
+      
+         
+        sourceFile = fopen(path.c_str(), "r");
+        long long numb;
+        if(sourceFile == NULL){
+            cout << "This file can't be opened\n";
+            return;
+        }
+         
+        fseek(sourceFile, 0, SEEK_END);
 
+		numb = ftell(sourceFile);
+		fseek(sourceFile, 0, SEEK_SET);
+        //infile->seekg(offset, start)
+        //printf("seek set from %d to %d", start, (start+offset)); 
+        unsigned char buffer[numb];
+         
+
+        fread(buffer, sizeof(char), numb, sourceFile);
+        //printf("file read: %s\n", buffer);
+       // string reply = "ker le download";
+		char buff[numb];
+        write(newsockfd, buffer, numb);
+        bzero(buff, fileSize);    
+
+        fclose(sourceFile);
+        //printf("file closed\n");
+
+		/*******************************************************************************************/
 			break;
 		}
 		if(cmd == "send_packet"){
@@ -78,6 +116,8 @@ void process_request(int newsockfd, string ip, int port){
 			break;
 		}				
 	}
+
+	return;
 }
 
 string transmit_data_to_tracker(int sockfd, char buffer[]){
@@ -93,8 +133,8 @@ string transmit_data_to_tracker(int sockfd, char buffer[]){
 	int n = send(sockfd, buffer, strlen(buffer), 0);
 	if(n<0) error("Error on writing!");
 
-	bzero(buffer, 1024);
-	n = recv(sockfd, buffer, 1024, 0);
+	bzero(buffer, BUFFER_SIZE);
+	n = recv(sockfd, buffer, BUFFER_SIZE, 0);
 	if(n<0) error("Error on reading!");
 
 	string r = buffer;
@@ -129,6 +169,124 @@ string connect_with_tracker(char buffer[]){
 			//char buffer[BUFFER_SIZE];
 		return transmit_data_to_tracker(sockfd, buffer);
 		//cout<<endl<<"*************************************************************"<<endl;			
+}
+
+void downloadChunk(string IP, int port, string path, string destination, long long fileSize){
+
+	int sockfd, n; 
+	struct sockaddr_in server_addr;
+	struct hostent *server;
+
+	string cmd = "get_chunk|" + path + "|" + to_string(fileSize) ;
+
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);	
+	if(sockfd < 0) error("Error Opening socket!");
+
+	server = gethostbyname(IP.c_str());
+	if(server == NULL) error("No such host..");
+	
+	bzero((char *) &server_addr, sizeof(server_addr));
+
+	server_addr.sin_family = AF_INET;
+	bcopy((char *) server->h_addr, (char *) &server_addr.sin_addr.s_addr, server->h_length);
+	server_addr.sin_port = htons(port);
+
+	if(connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) error("Connection failed !");	
+
+	n = send(sockfd, cmd.c_str(), strlen(cmd.c_str()), 0);
+	if(n<0) error("Error on writing!");
+
+	char buff[BUFFER_SIZE];
+	bzero(buff, BUFFER_SIZE);
+	n = recv(sockfd, buff, BUFFER_SIZE, 0);
+	if(n<0) error("Error on reading!");
+
+	ofstream f; f.open(destination);
+    f << buff; f.close();
+	//cout<<endl<<"chaaaaaaaaaaaaaallllllllll jaaaaaaaaaaaaaaaaa yrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"<<endl;
+
+}
+
+void download(vector<string> tkns){
+	string groupId = tkns[1];
+	string fileName = tkns[2];
+	string destination = tkns[3];
+
+	//cout<<endl<<"INSIDE DOWNLOAD : "<<groupId<<" "<<fileName<<" "<<destination<<endl;
+	int sockfd, n; 
+	struct sockaddr_in server_addr;
+	struct hostent *server;
+
+	string cmd = "seeder " + groupId + " " + fileName + " " + userID;
+
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);	
+	if(sockfd < 0) error("Error Opening socket!");
+
+	server = gethostbyname(TRACKER_IP.c_str());
+	if(server == NULL) error("No such host..");
+	
+	bzero((char *) &server_addr, sizeof(server_addr));
+
+	server_addr.sin_family = AF_INET;
+	bcopy((char *) server->h_addr, (char *) &server_addr.sin_addr.s_addr, server->h_length);
+	server_addr.sin_port = htons(TRACKER_PORT);
+
+	if(connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) error("Connection failed !");	
+
+	n = send(sockfd, cmd.c_str(), strlen(cmd.c_str()), 0);
+	if(n<0) error("Error on writing!");
+
+	char buff[BUFFER_SIZE];
+	bzero(buff, BUFFER_SIZE);
+	n = recv(sockfd, buff, BUFFER_SIZE, 0);
+	if(n<0) error("Error on reading!");
+
+	string r = buff;
+	vector<string> seedList;
+	stringstream ss(r);
+    while(ss.good()){
+     	string sb;
+		getline(ss, sb, '|');
+       	seedList.push_back(sb);
+	}
+
+	vector<string> seedIp;
+	vector<int> seedPort;
+	string msg = seedList[0];
+	long long FILE_SIZE = stoll(seedList[seedList.size()-2]);
+	string filePath = seedList[seedList.size()-1];
+
+	cout<<"Response: "<<msg<<endl;
+	for(int i=1; i<seedList.size()-2; i++){
+
+		string seedAddr = seedList[i];
+		vector<string> sda;
+		stringstream ss1(seedAddr);
+    	while(ss1.good()){
+     		string sb1;
+			getline(ss1, sb1, ':');
+       		sda.push_back(sb1);
+		}
+
+		seedIp.push_back(sda[0]);
+		seedPort.push_back(stoi(sda[1]));
+	}
+	for(int i=0; i<seedIp.size(); i++){
+		cout<<"          "<<i+1<<". IP : "<<seedIp[i]<<" | Port : "<<seedPort[i]<<endl;
+	}
+	cout<<endl;
+	
+	/*fstream in(downloadFilepath,ios::out|ios::binary);
+    in.write(ss.c_str(),strlen(ss.c_str()));  
+    in.close();*/
+
+	long long NO_OF_CHUNKS = (FILE_SIZE + (BUFFER_SIZE-1))/BUFFER_SIZE;
+	cout<<"          "<<"No. of chunks created : "<<NO_OF_CHUNKS<<endl;
+	
+
+	downloadChunk(seedIp[0], seedPort[0], filePath, destination, FILE_SIZE);
+	//thread download_chunk(downloadChunk,seedPort[0], seedPort[0], filePath, destination, FILE_SIZE);
+	cout<<endl;
 }
 
 bool isLogout(char buffer[]){
@@ -235,6 +393,24 @@ void execute_command(char buffer[]){
 		return;
 	}
 
+	if(keyword == "download_file"){
+		if(loginStatus == false){
+			cout<<"Response: Please login your account to download files. "<<endl<<endl;
+			return;
+		}
+		else{
+			vector<string> tkns = tokens;
+			if(tkns.size()!=4){ 	
+				cout<<"Response: Please enter valid command. "<<endl<<endl;
+				return;
+			}
+			download(tkns);
+			return;
+			//threadVector.push_back(thread(download_file,group_id,FileId,Filepath));
+			//thread download_thread(download, tkns);
+		}
+	}
+
 	if(keyword == "join_group" || keyword == "create_group" || keyword == "leave_group" || keyword == "requests" || keyword == "accept_request" || keyword == "list_files"){
 		string b = buffer;
 		b = b + " " + userID;
@@ -286,7 +462,16 @@ void init_server(){
 		if(newsockfd<0) break;
 		int port = (ntohs(client_addr.sin_port));
 		string ip = inet_ntoa(client_addr.sin_addr);
-   		thV.push_back(thread(process_request,newsockfd,ip,port));
+		process_request(newsockfd, port);
+
+		/*pthread_t td;
+        int *pclient = (int*)malloc(sizeof(int));
+        *pclient = newsockfd;
+		int *prt = (int*)malloc(sizeof(int));
+        *prt = port;
+        pthread_create(&td, NULL, process_request, pclient, prt);*/
+		//cout<<"hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii";
+   		//thV.push_back(thread(process_request,newsockfd,ip,port));
 	}
 
  	for(auto itr = thV.begin(); itr != thV.end(); itr++) if(itr->joinable()) itr->join();
@@ -325,7 +510,7 @@ int main(int argc, char *argv[])
 		
 	while(true){
 		//pthread_mutex_lock(&mutex);
-		char buffer[1024];
+		char buffer[BUFFER_SIZE];
 		cout<<"Command : ";
 		bzero(buffer, BUFFER_SIZE);
 		fgets(buffer, BUFFER_SIZE, stdin);

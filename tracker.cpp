@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include<pthread.h>
+#include <experimental/filesystem>
 using namespace std;
 #define BUFFER_SIZE 1024 
 
@@ -13,6 +14,7 @@ unordered_map<string, string> admin;
 unordered_map<string, set<string>> groupReqs;
 unordered_map<string, unordered_map<string, set<pair<string,string>>>> files;
 unordered_map<string, string> namePathMap;
+unordered_map<string, long long> nameSizeMap;
 
 string TRACKER_IP;
 int TRACKER_PORT;
@@ -187,6 +189,12 @@ bool isMember(string groupId, string userId){
     return false;
 }
 
+bool isFileExist(string path)
+{
+    std::ifstream infile(path.c_str());
+    return infile.good();
+}
+
 string getFileName(string path){
     int i;
     for(i=path.length()-1; i>=0; i--){
@@ -202,16 +210,27 @@ string getFileName(string path){
     else return "Invalid";
 }
 
+void saveFileSize(string path, string fname){
+    ifstream f(path,ios::ate|ios::binary);
+	long long size = f.tellg(); f.close();
+
+    nameSizeMap[fname] = size;
+}
+
 string uploadFile(string filePath, string groupId, string userId, string iport){
     
     if(groups.find(groupId) != groups.end()){
 
        if(!isMember(groupId, userId)) return("You're not a member of this group.");
 
+       if(!isFileExist(filePath)) return ("You've provided incorrect file path. Please provide correct path."); 
+
        string gid = groupId.substr(0, groupId.length()-1); 
        string fileName = getFileName(filePath);
 
-       if(fileName == "Invalid") return ("You've provided incorrect file path. Please provide correct path.");
+       if(fileName == "Invalid") return ("Please provide absolute path.");
+
+       saveFileSize(filePath, fileName);
        
        if(containsFile(fileName, groupId)){
            if(files[groupId][fileName].find({userId, iport}) != files[groupId][fileName].end()){
@@ -253,7 +272,26 @@ string listFiles(string groupId, string userId){
     else return("Group Doesn't exist.");
 }
 
+string seederList(string userId, string groupId, string fileName){
+
+    if(groups.find(groupId)==groups.end()) return "This group doesn't exist.";
+
+    if(!isMember(groupId, userId)) return "You're not a member of this group.";
+
+    if(files[groupId].find(fileName)==files[groupId].end()) return "This file doesn't exist.";
+
+    string resp = "Seed count : " + to_string(files[groupId][fileName].size()) + " and File size : " + to_string(nameSizeMap[fileName]) +  "|";
+
+    for(auto seeder : files[groupId][fileName]){
+        resp += seeder.second + "|";
+    }
+    resp += to_string(nameSizeMap[fileName]) + "|" + namePathMap[fileName];
+    return resp;
+}
+
 string processCommand(string command){
+
+    cout<<endl<<"RECEIVED COMMAND : "<<command<<endl;
 
     vector<string> tokens;
 	stringstream ss(command);
@@ -345,6 +383,14 @@ string processCommand(string command){
         if(tokens.size()!=2) return("Please enter valid command!");
         string uid = tokens[1];
         return logout(uid);
+    }
+
+    if(cmd == "seeder"){
+        string gid = tokens[1];
+        gid += "\n";
+        string fileName = tokens[2];
+        string uid = tokens[3];
+        return seederList(uid, gid, fileName);
     }
 
     return ("Invalid command!");
