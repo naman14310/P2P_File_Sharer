@@ -15,6 +15,7 @@ unordered_map<string, set<string>> groupReqs;
 unordered_map<string, unordered_map<string, set<pair<string,string>>>> files;
 unordered_map<string, string> namePathMap;
 unordered_map<string, long long> nameSizeMap;
+map<pair<string, string>, bool> onlineStatus;
 
 string TRACKER_IP;
 int TRACKER_PORT;
@@ -47,9 +48,11 @@ string createUser(string userId, string password){
 
 }
 
-string login(string userId, string password){
+string login(string userId, string password, string iport){
     if(users.find(userId) != users.end()){
         if(users[userId] == password){
+            pair<string, string> p = {userId, iport};
+            onlineStatus[p] = true;
             return ("Login Successfull.");
         }
         else{
@@ -101,8 +104,10 @@ string leaveGroup(string groupId, string userId){
     else return("Group Doesn't exist.");
 }
 
-string logout(string userId){
+string logout(string userId, string iport){
     if(users.find(userId) != users.end()){
+        pair<string, string> p = {userId, iport}; 
+        onlineStatus[p] = false;
         return ("Logout Successfull.");
     }
     else return ("User Doesn't exist.");
@@ -252,6 +257,13 @@ string uploadFile(string filePath, string groupId, string userId, string iport){
     else return("Group Doesn't exist.");
 }
 
+bool isSeederExist(string groupId, string fileName){
+    for(auto seeder : files[groupId][fileName]){
+        if(onlineStatus[{seeder.first, seeder.second}]==true) return true;
+    }
+    return false;
+}
+
 string listFiles(string groupId, string userId){
     if(groups.find(groupId) != groups.end()){
 
@@ -263,9 +275,11 @@ string listFiles(string groupId, string userId){
 
         string s = "";
         for(auto file : files[groupId]){
+            if(!isSeederExist(groupId, file.first)) continue;
             string fs = file.first;
             s += "<" + fs + ">" + "|";
         }
+        if(s == "") return "Currently all seeders are offline.";
         string resp = s.substr(0, s.length()-1);
         return resp;
     }
@@ -282,16 +296,20 @@ string seederList(string userId, string groupId, string fileName){
 
     string resp = "Seed count : " + to_string(files[groupId][fileName].size()) + " and File size : " + to_string(nameSizeMap[fileName]) +  "|";
 
+    bool inside = false;
     for(auto seeder : files[groupId][fileName]){
+        if(onlineStatus[{seeder.first, seeder.second}]==false) continue;
+        inside = true;
         resp += seeder.second + "|";
     }
+    if(inside==false) return("Sorry for inconvinience! Currently all seeders are offline.");
     resp += to_string(nameSizeMap[fileName]) + "|" + namePathMap[fileName];
     return resp;
 }
 
 string processCommand(string command){
 
-    cout<<endl<<"RECEIVED COMMAND : "<<command<<endl;
+    //cout<<endl<<"RECEIVED COMMAND : "<<command<<endl;
 
     vector<string> tokens;
 	stringstream ss(command);
@@ -310,10 +328,12 @@ string processCommand(string command){
     }
 
     if(cmd == "login"){
-        if(tokens.size()!=3) return("Please enter valid command!");
+        if(tokens.size()!=4) return("Please enter valid command!");
         string uid =  tokens[1];
         string pass = tokens[2];
-        return login(uid, pass);
+        string iport = tokens[3];
+        //cout<<endl<<uid<<"|"<<pass<<"|"<<iport;
+        return login(uid, pass, iport);
     }
 
     if(cmd == "create_group"){
@@ -380,9 +400,10 @@ string processCommand(string command){
     }
 
     if(cmd == "logout"){
-        if(tokens.size()!=2) return("Please enter valid command!");
+        if(tokens.size()!=3) return("Please enter valid command!");
         string uid = tokens[1];
-        return logout(uid);
+        string iport = tokens[2];
+        return logout(uid, iport);
     }
 
     if(cmd == "seeder"){

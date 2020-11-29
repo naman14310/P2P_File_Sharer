@@ -1,4 +1,4 @@
-#include<bits/stdc++.h>
+#include <bits/stdc++.h>
 #include <unistd.h> 
 #include <sys/socket.h> 
 #include <netinet/in.h> 
@@ -6,9 +6,9 @@
 #include <fstream>
 #include <thread>
 #include <netdb.h>
-#include<pthread.h> 
+#include <pthread.h> 
 #include <semaphore.h>
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 524288
 using namespace std;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -25,6 +25,7 @@ string passWORD;
 bool loginStatus = false;
 
 vector<thread> thV;
+vector<pair<string,string>> downloadHistory;
 
 void error(string s){
     cout<<s;
@@ -53,11 +54,6 @@ void save_tracker_details(string path){
 } 
 
 void process_request(int newsockfd, int port){
-	
-	/*int newsockfd = * (int*)p_newsockfd;
-    free(p_newsockfd);
-	int port = * (int*)p_port;
-    free(p_port);*/
 	string ip = TRACKER_IP;
 
 	while(true){
@@ -78,38 +74,28 @@ void process_request(int newsockfd, int port){
 		if(cmd == "get_chunk"){
 			string path = tokens[1];
 			long long fileSize = stoll(tokens[2]);
-			/*****************************************************************************************/
+			
 		FILE* sourceFile;
       
-         
         sourceFile = fopen(path.c_str(), "r");
         long long numb;
         if(sourceFile == NULL){
-            cout << "This file can't be opened\n";
-            return;
+            cout << "This file can't be opened\n"; return;
         }
          
         fseek(sourceFile, 0, SEEK_END);
-
 		numb = ftell(sourceFile);
 		fseek(sourceFile, 0, SEEK_SET);
-        //infile->seekg(offset, start)
-        //printf("seek set from %d to %d", start, (start+offset)); 
         unsigned char buffer[numb];
          
-
         fread(buffer, sizeof(char), numb, sourceFile);
-        //printf("file read: %s\n", buffer);
-       // string reply = "ker le download";
+
 		char buff[numb];
         write(newsockfd, buffer, numb);
         bzero(buff, fileSize);    
-
         fclose(sourceFile);
-        //printf("file closed\n");
 
-		/*******************************************************************************************/
-			break;
+		break;
 		}
 		if(cmd == "send_packet"){
 
@@ -139,9 +125,7 @@ string transmit_data_to_tracker(int sockfd, char buffer[]){
 
 	string r = buffer;
 	cout<<"Response: "<<r;
-	//for(auto itr = thV.begin(); itr != thV.end(); itr++) if(itr->joinable()) itr->join();
-	/*i = strncmp("Bye", buffer, 3);
-	if(i == 0) return;*/
+
 	cout<<endl<<endl;
 	return r;
 }
@@ -166,9 +150,7 @@ string connect_with_tracker(char buffer[]){
 
 		if(connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) error("Connection failed !");
 
-			//char buffer[BUFFER_SIZE];
 		return transmit_data_to_tracker(sockfd, buffer);
-		//cout<<endl<<"*************************************************************"<<endl;			
 }
 
 void downloadChunk(string IP, int port, string path, string destination, long long fileSize){
@@ -203,8 +185,6 @@ void downloadChunk(string IP, int port, string path, string destination, long lo
 
 	ofstream f; f.open(destination);
     f << buff; f.close();
-	//cout<<endl<<"chaaaaaaaaaaaaaallllllllll jaaaaaaaaaaaaaaaaa yrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"<<endl;
-
 }
 
 void download(vector<string> tkns){
@@ -212,7 +192,6 @@ void download(vector<string> tkns){
 	string fileName = tkns[2];
 	string destination = tkns[3];
 
-	//cout<<endl<<"INSIDE DOWNLOAD : "<<groupId<<" "<<fileName<<" "<<destination<<endl;
 	int sockfd, n; 
 	struct sockaddr_in server_addr;
 	struct hostent *server;
@@ -275,17 +254,13 @@ void download(vector<string> tkns){
 		cout<<"          "<<i+1<<". IP : "<<seedIp[i]<<" | Port : "<<seedPort[i]<<endl;
 	}
 	cout<<endl;
-	
-	/*fstream in(downloadFilepath,ios::out|ios::binary);
-    in.write(ss.c_str(),strlen(ss.c_str()));  
-    in.close();*/
 
-	long long NO_OF_CHUNKS = (FILE_SIZE + (BUFFER_SIZE-1))/BUFFER_SIZE;
-	cout<<"          "<<"No. of chunks created : "<<NO_OF_CHUNKS<<endl;
-	
+	long long NO_OF_CHUNKS = (FILE_SIZE)/1024;
+	cout<<"          "<<"No. of chunks created : "<<NO_OF_CHUNKS<<endl;	
 
 	downloadChunk(seedIp[0], seedPort[0], filePath, destination, FILE_SIZE);
-	//thread download_chunk(downloadChunk,seedPort[0], seedPort[0], filePath, destination, FILE_SIZE);
+	downloadHistory.push_back({groupId, fileName});
+	cout<<endl<<"          "<<"File Downloaded Successfully."<<endl;
 	cout<<endl;
 }
 
@@ -301,7 +276,30 @@ bool listAllGroups(char buffer[]){
 	else return false;
 }
 
+bool isShowDownloads(char buffer[]){
+	int i = strncmp("show_downloads", buffer, 14);
+	if(i == 0) return true;
+	else return false;
+}
+
 void execute_command(char buffer[]){
+
+	if(isShowDownloads(buffer)){
+		if(loginStatus == false){
+			cout<<"Response: You're not logged in."<<endl<<endl;
+			return;
+		}
+
+		if(downloadHistory.size()==0){
+			cout<<"Response: Download history is empty."<<endl<<endl;
+			return;
+		}
+
+		for(auto dh : downloadHistory){
+			cout<<"          "<<"[C] "<< dh.first << " "<< dh.second<<endl;
+		}
+
+	}
 
 	if(isLogout(buffer)){
 
@@ -310,7 +308,7 @@ void execute_command(char buffer[]){
 			return;
 		}
 
-		string data = "logout " + userID;
+		string data = "logout " + userID + " " + IPORT;
 		char buff[BUFFER_SIZE];
 		strcpy(buff, data.c_str());
 
@@ -406,14 +404,18 @@ void execute_command(char buffer[]){
 			}
 			download(tkns);
 			return;
-			//threadVector.push_back(thread(download_file,group_id,FileId,Filepath));
-			//thread download_thread(download, tkns);
 		}
 	}
 
 	if(keyword == "join_group" || keyword == "create_group" || keyword == "leave_group" || keyword == "requests" || keyword == "accept_request" || keyword == "list_files"){
 		string b = buffer;
 		b = b + " " + userID;
+		strcpy(buffer, b.c_str());
+	}
+
+	if(keyword == "login"){
+		string b = buffer;
+		b = b + " " + IPORT;
 		strcpy(buffer, b.c_str());
 	}
 
@@ -463,15 +465,6 @@ void init_server(){
 		int port = (ntohs(client_addr.sin_port));
 		string ip = inet_ntoa(client_addr.sin_addr);
 		process_request(newsockfd, port);
-
-		/*pthread_t td;
-        int *pclient = (int*)malloc(sizeof(int));
-        *pclient = newsockfd;
-		int *prt = (int*)malloc(sizeof(int));
-        *prt = port;
-        pthread_create(&td, NULL, process_request, pclient, prt);*/
-		//cout<<"hiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii";
-   		//thV.push_back(thread(process_request,newsockfd,ip,port));
 	}
 
  	for(auto itr = thV.begin(); itr != thV.end(); itr++) if(itr->joinable()) itr->join();
@@ -480,11 +473,7 @@ void init_server(){
 
 int main(int argc, char *argv[]) 
 { 
-	//int sockfd, portno, n; 
-	//struct sockaddr_in server_addr;
-	//char buffer[1024];
-	//struct hostent *server; 
-	//sem_init(&m,0,1);
+
 	if(argc < 3) error("Please write valid command");
 
 	//cout<<"Hello";
@@ -505,74 +494,14 @@ int main(int argc, char *argv[])
 	thread peer_server_thread(init_server);
 	peer_server_thread.detach();
 
-	//while(true){
-		//thV.push_back(thread(connect_with_tracker));
-		
 	while(true){
-		//pthread_mutex_lock(&mutex);
+
 		char buffer[BUFFER_SIZE];
 		cout<<"Command : ";
 		bzero(buffer, BUFFER_SIZE);
 		fgets(buffer, BUFFER_SIZE, stdin);
 		execute_command(buffer);
-		//thV.push_back(thread(connect_with_tracker, buffer)); 
-		//pthread_mutex_unlock(&mutex);
 	}
-
-		//for(auto itr = thV.begin(); itr != thV.end(); itr++) if(itr->joinable()) itr->join();
-
-		//while(true){
-			
-	//	}
-	//}
-
-	/*sockfd = socket(AF_INET, SOCK_STREAM, 0);	
-	if(sockfd < 0)
-        error("Error Opening socket!");
-
-	server = gethostbyname(TRACKER_IP.c_str());
-	if(server == NULL){
-		error("No such host..");
-	}
-
-	bzero((char *) &server_addr, sizeof(server_addr));
-	server_addr.sin_family = AF_INET;
-	bcopy((char *) server->h_addr, (char *) &server_addr.sin_addr.s_addr, server->h_length);
-    server_addr.sin_port = htons(portno);
-
-	if(connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0){
-		error("Connection failed !");
-	}	
-	
-	while(true){
-		cout<<"Command : ";
-		bzero(buffer, 1024);
-		fgets(buffer, 1024, stdin);
-
-		int i = strncmp("Bye", buffer, 3);
-        if(i == 0){
-			string con_closed = "closed";
-			strcpy(buffer, con_closed.c_str());;
-			n = write(sockfd, buffer, strlen(buffer));
-			if(n<0) error("Error on writing!");
-			break;
-		}
-
-		n = write(sockfd, buffer, strlen(buffer));
-		if(n<0) error("Error on writing!");
-
-		bzero(buffer, 1024);
-		n = read(sockfd, buffer, 1024);
-		if(n<0) error("Error on reading!");
-
-		cout<<"Response: "<<buffer;
-
-		i = strncmp("Bye", buffer, 3);
-        if(i == 0) break;
-        cout<<endl<<endl;
-	}
-
-	close(sockfd);*/
 	
 	return 0; 
 } 
