@@ -1,4 +1,4 @@
-# Torrent - A peer to peer file sharing system
+# A peer to peer file sharing system
 
 It is a group based file sharing system where users can share, download files from the group they belongs to (only Admins will have the permissions to manage the group). Download will be parallel with multiple pieces from multiple peers.
 
