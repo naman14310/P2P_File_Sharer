@@ -2,6 +2,7 @@
 
 It is a group based file sharing system where users can share, download files from the group they belongs to (only Admins will have the permissions to manage the group). Download will be parallel with multiple pieces from multiple peers.
 
+<br>
 
 ## How to Run ?
 
@@ -15,6 +16,7 @@ It is a group based file sharing system where users can share, download files fr
 
 Note : tracker_info.txt contains the ip, port details of all trackers
 
+<br>
 
 ## Commands
 
